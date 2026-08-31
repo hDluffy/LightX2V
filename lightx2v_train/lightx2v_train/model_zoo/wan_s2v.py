@@ -1,4 +1,5 @@
 import importlib
+import inspect
 import math
 import os
 from glob import glob
@@ -78,6 +79,9 @@ class GenericWanS2VTrainingAdapter(torch.nn.Module):
             )
         raise RuntimeError(f"Unsupported S2V adapter forward_style={self.forward_style!r}.")
 
+    def forward(self, hidden_states, timestep, context, seq_len, s2v):
+        return self.forward_lightx2v_s2v(hidden_states, timestep, context, seq_len, s2v)
+
 
 
 class DiffSynthWanS2VBackbone(torch.nn.Module):
@@ -119,6 +123,7 @@ class DiffSynthWanS2VBackbone(torch.nn.Module):
         self._set_diffsynth_env(download_source, skip_download)
         WanVideoPipeline, ModelConfig, model_fn_wans2v = self._import_diffsynth()
         self.model_fn_wans2v = model_fn_wans2v
+        self._model_fn_wans2v_accepts_add_last_motion = self._accepts_keyword(model_fn_wans2v, "add_last_motion")
         model_configs = self._build_model_configs(
             ModelConfig,
             model_path=model_path,
@@ -140,6 +145,7 @@ class DiffSynthWanS2VBackbone(torch.nn.Module):
                 "model_id_with_origin_paths."
             )
         self.dit = pipe.dit
+        self._make_audio_injection_autograd_safe()
         if hasattr(self.dit, "train"):
             self.dit.train()
 
@@ -161,6 +167,29 @@ class DiffSynthWanS2VBackbone(torch.nn.Module):
                 "or add its repository to PYTHONPATH before training."
             ) from exc
         return WanVideoPipeline, ModelConfig, model_fn_wans2v
+
+    @staticmethod
+    def _accepts_keyword(function, keyword):
+        try:
+            parameters = inspect.signature(function).parameters.values()
+        except (TypeError, ValueError):
+            return False
+        return any(parameter.name == keyword or parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters)
+
+    def _make_audio_injection_autograd_safe(self):
+        after_transformer_block = getattr(self.dit, "after_transformer_block", None)
+        if after_transformer_block is None:
+            return
+        audio_injector = getattr(self.dit, "audio_injector", None)
+        injected_block_ids = getattr(audio_injector, "injected_block_id", None)
+
+        def checkpoint_safe_after_transformer_block(block_idx, hidden_states, *args, **kwargs):
+            is_injection_block = injected_block_ids is None or block_idx in injected_block_ids
+            if is_injection_block and torch.is_grad_enabled() and hidden_states.requires_grad:
+                hidden_states = hidden_states.clone()
+            return after_transformer_block(block_idx, hidden_states, *args, **kwargs)
+
+        self.dit.after_transformer_block = checkpoint_safe_after_transformer_block
 
     def _build_model_configs(self, ModelConfig, model_path, model_paths=None, model_id_with_origin_paths=None):
         configs = []
@@ -311,20 +340,33 @@ class DiffSynthWanS2VBackbone(torch.nn.Module):
             )
         return torch.cat(outputs, dim=0)
 
+    def forward(self, hidden_states, timestep, context, seq_len=None, s2v=None):
+        return self.forward_lightx2v_s2v(hidden_states, timestep, context, seq_len, s2v)
+
     def _forward_one(self, hidden_states, timestep, context, ref_latents, motion_latents, cond_latents, audio_input, s2v):
         full_latents = torch.cat([ref_latents, hidden_states], dim=2)
+        add_last_motion = int(s2v.get("add_last_motion", 2))
+        model_kwargs = {
+            "s2v_pose_latents": cond_latents,
+            "motion_latents": motion_latents,
+            "drop_motion_frames": bool(s2v.get("drop_motion_frames", False)),
+            "use_gradient_checkpointing": self.use_gradient_checkpointing,
+            "use_gradient_checkpointing_offload": self.use_gradient_checkpointing_offload,
+        }
+        if self._model_fn_wans2v_accepts_add_last_motion:
+            model_kwargs["add_last_motion"] = add_last_motion
+        elif add_last_motion != 2:
+            raise RuntimeError(
+                "The installed DiffSynth model_fn_wans2v does not support add_last_motion, "
+                f"but the cached sample requests add_last_motion={add_last_motion}."
+            )
         prediction = self.model_fn_wans2v(
             self.dit,
             full_latents,
             timestep,
             context,
             audio_input,
-            s2v_pose_latents=cond_latents,
-            motion_latents=motion_latents,
-            drop_motion_frames=bool(s2v.get("drop_motion_frames", False)),
-            add_last_motion=int(s2v.get("add_last_motion", 2)),
-            use_gradient_checkpointing=self.use_gradient_checkpointing,
-            use_gradient_checkpointing_offload=self.use_gradient_checkpointing_offload,
+            **model_kwargs,
         )
         prediction = self._unwrap_prediction(prediction)
         if prediction.ndim == 4:
@@ -572,6 +614,14 @@ class WanS2VTrainModel(BaseModel):
         }
 
         if hasattr(denoiser, "forward_lightx2v_s2v"):
+            if self.is_fsdp2_wrapped():
+                return denoiser(
+                    hidden_states=hidden_states,
+                    timestep=timestep,
+                    context=context,
+                    seq_len=seq_len,
+                    s2v=s2v,
+                )
             return denoiser.forward_lightx2v_s2v(
                 hidden_states=hidden_states,
                 timestep=timestep,
