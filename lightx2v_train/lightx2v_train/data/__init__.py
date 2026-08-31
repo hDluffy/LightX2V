@@ -1,6 +1,7 @@
 from lightx2v_train.utils.registry import build_data
 
 from .image_dataset import build_image_dataset
+from .s2v_dataset import build_wan_s2v_cached_dataset
 from .video_dataset import build_causal_forcing_lmdb_dataset, build_prompt_dataset, build_wan_t2v_cached_dataset, build_wan_t2v_video_dataset
 
 __all__ = [
@@ -10,4 +11,5 @@ __all__ = [
     "build_wan_t2v_video_dataset",
     "build_wan_t2v_cached_dataset",
     "build_causal_forcing_lmdb_dataset",
+    "build_wan_s2v_cached_dataset",
 ]

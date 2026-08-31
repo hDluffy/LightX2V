@@ -177,6 +177,20 @@ class WanRunner(DisaggMixin, DefaultRunner):
             return self.config.get("parallel", {}).get("vae_parallel", True)
         return False
 
+    def get_vae_dtype(self):
+        vae_dtype = self.config.get("vae_dtype", None)
+        if not vae_dtype:
+            return GET_DTYPE()
+        if isinstance(vae_dtype, torch.dtype):
+            return vae_dtype
+        if isinstance(vae_dtype, str):
+            key = vae_dtype.strip()
+            if key in DTYPE_MAP:
+                return DTYPE_MAP[key]
+            valid_dtypes = ", ".join(sorted(DTYPE_MAP))
+            raise ValueError(f"Unsupported vae_dtype {vae_dtype!r}. Expected one of: {valid_dtypes}")
+        raise TypeError(f"vae_dtype must be a torch.dtype or string, got {type(vae_dtype).__name__}")
+
     def load_vae_encoder(self):
         # offload config
         vae_offload = self.config.get("vae_cpu_offload", self.config.get("cpu_offload"))
@@ -194,7 +208,7 @@ class WanRunner(DisaggMixin, DefaultRunner):
             "load_from_rank0": self.config.get("load_from_rank0", False),
             "use_lightvae": self.config.get("use_lightvae", False),
             "dummy_model": self.config.get("dummy_model", False),
-            "dtype": GET_DTYPE() if not self.config.get("vae_dtype", None) else self.config["vae_dtype"],
+            "dtype": self.get_vae_dtype(),
         }
 
         if self.config["task"] not in ["i2v", "flf2v", "animate", "vace", "s2v", "rs2v"]:
@@ -217,7 +231,7 @@ class WanRunner(DisaggMixin, DefaultRunner):
             "use_tiling": self.config.get("use_tiling_vae", False),
             "cpu_offload": vae_offload,
             "use_lightvae": self.config.get("use_lightvae", False),
-            "dtype": GET_DTYPE() if not self.config.get("vae_dtype", None) else self.config["vae_dtype"],
+            "dtype": self.get_vae_dtype(),
             "load_from_rank0": self.config.get("load_from_rank0", False),
             "dummy_model": self.config.get("dummy_model", False),
         }

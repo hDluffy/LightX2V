@@ -619,14 +619,16 @@ class DmdTrainer(BaseTrainer):
 class VideoDmdTrainer(DmdTrainer):
     trainer_name = "video_dmd"
     allowed_model_names = {"wan_t2v"}
+    allowed_train_types = {"full"}
 
     def __init__(self, config):
         super().__init__(config)
         if self.model_config.get("name") not in self.allowed_model_names:
             allowed = ", ".join(repr(name) for name in sorted(self.allowed_model_names))
             raise ValueError(f"{self.trainer_name} trainer currently requires model.name in {{{allowed}}}.")
-        if self.train_type != "full":
-            raise ValueError(f"{self.trainer_name} trainer only supports training.train_type='full'.")
+        if self.train_type not in self.allowed_train_types:
+            allowed_types = ", ".join(repr(name) for name in sorted(self.allowed_train_types))
+            raise ValueError(f"{self.trainer_name} trainer requires training.train_type in {{{allowed_types}}}.")
 
         self.num_train_timestep = int(self.dmd_config.get("num_train_timestep", self.config["scheduler"].get("num_train_timesteps", 1000)))
         default_denoising_steps = [int(round(self.num_train_timestep * (1.0 - step_idx / self.num_inference_steps))) for step_idx in range(self.num_inference_steps)]

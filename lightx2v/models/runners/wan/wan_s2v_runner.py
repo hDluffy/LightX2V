@@ -14,7 +14,8 @@ from torchvision import transforms
 from lightx2v.models.input_encoders.hf.wan.s2v.audio_encoder import AudioEncoder
 from lightx2v.models.networks.wan.s2v_model import WanS2VModel
 from lightx2v.models.networks.wan.s2v_utils import get_size_less_than_area
-from lightx2v.models.runners.wan.wan_runner import WanRunner
+from lightx2v.models.runners.wan.wan_runner import WanRunner, build_wan_model_with_lora
+from lightx2v.models.schedulers.wan.s2v.step_distill_scheduler import WanS2VStepDistillScheduler
 from lightx2v.models.schedulers.wan.s2v.s2v_scheduler import WanS2VScheduler
 from lightx2v.server.metrics import monitor_cli
 from lightx2v.utils.envs import GET_DTYPE
@@ -64,7 +65,11 @@ class WanS2VRunner(WanRunner):
         self.audio_sample_m = 0
 
     def init_scheduler(self):
-        self.scheduler = WanS2VScheduler(self.config)
+        if self.config.get("scheduler_type") == "WanS2VStepDistillScheduler" or self.config.get("denoising_step_list"):
+            self.scheduler = WanS2VStepDistillScheduler(self.config)
+            logger.info("Using WanS2VStepDistillScheduler")
+        else:
+            self.scheduler = WanS2VScheduler(self.config)
 
     def init_modules(self):
         logger.info("Initializing WanS2V runner modules...")
@@ -81,7 +86,11 @@ class WanS2VRunner(WanRunner):
         self.audio_encoder = self.load_audio_encoder()
 
     def load_transformer(self):
-        return WanS2VModel(self.config["model_path"], self.config, self.init_device)
+        wan_model_kwargs = {"model_path": self.config["model_path"], "config": self.config, "device": self.init_device}
+        lora_configs = self.config.get("lora_configs")
+        if not lora_configs:
+            return WanS2VModel(**wan_model_kwargs)
+        return build_wan_model_with_lora(WanS2VModel, self.config, wan_model_kwargs, lora_configs, model_type="wan2.2_s2v")
 
     def load_image_encoder(self):
         return None

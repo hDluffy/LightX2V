@@ -170,7 +170,7 @@ class WanDreamZeroRunner(WanRunner):
             "load_from_rank0": self.config.get("load_from_rank0", False),
             "use_lightvae": self.config.get("use_lightvae", False),
             "dummy_model": self.config.get("dummy_model", False),
-            "dtype": GET_DTYPE() if not self.config.get("vae_dtype", None) else self.config["vae_dtype"],
+            "dtype": self.get_vae_dtype(),
         }
         vae_encoder = self.vae_cls(**vae_config)
         if not self.config.get("dummy_model", False):
@@ -192,7 +192,7 @@ class WanDreamZeroRunner(WanRunner):
             "use_tiling": self.config.get("use_tiling_vae", False),
             "cpu_offload": vae_offload,
             "use_lightvae": self.config.get("use_lightvae", False),
-            "dtype": GET_DTYPE() if not self.config.get("vae_dtype", None) else self.config["vae_dtype"],
+            "dtype": self.get_vae_dtype(),
             "load_from_rank0": self.config.get("load_from_rank0", False),
             "dummy_model": self.config.get("dummy_model", False),
         }
