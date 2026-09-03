@@ -85,7 +85,11 @@ def build_runner(args):
     if config.get("parallel"):
         raise RuntimeError("S2V cache builder only supports single-process encoding. Use a sharded metadata split for multi-GPU cache construction.")
     runner = RUNNER_REGISTER["wan2.2_s2v"](config)
-    runner.init_modules()
+    runner.text_encoders = runner.load_text_encoder()
+    runner.vae_encoder, runner.vae_decoder = runner.load_vae()
+    runner.audio_encoder = runner.load_audio_encoder()
+    runner.run_input_encoder = runner._run_input_encoder_local_s2v
+    runner.config.lock()
     return runner
 
 

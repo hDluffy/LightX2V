@@ -5,7 +5,7 @@ scipy
 torch<=2.8.0
 torchvision<=0.23.0
 torchaudio<=2.8.0
-torchao
+# torchao is optional; install it only when using a TorchAO quantization scheme.
 diffusers
 transformers
 tokenizers
@@ -16,6 +16,8 @@ opencv-python
 imageio
 imageio-ffmpeg
 einops
+librosa
+soundfile
 loguru
 langdetect>=1.0.9
 sgl-kernel
@@ -41,3 +43,5 @@ zmq
 jsonschema
 pymongo
 modelscope
+omegaconf
+peft

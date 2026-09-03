@@ -46,6 +46,8 @@ dependencies = [
     "imageio",
     "imageio-ffmpeg",
     "einops",
+    "librosa",
+    "soundfile",
     "loguru",
     "qtorch",
     "ftfy",

@@ -3,8 +3,11 @@ import math
 
 try:
     import librosa
-except ImportError:
+except ImportError as exc:
     librosa = None
+    _LIBROSA_IMPORT_ERROR = exc
+else:
+    _LIBROSA_IMPORT_ERROR = None
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -51,6 +54,9 @@ def linear_interpolation(features, input_fps, output_fps, output_len=None):
 
 class AudioEncoder:
     def __init__(self, device="cpu", model_id="facebook/wav2vec2-base-960h"):
+        if librosa is None:
+            raise ImportError("Wan S2V audio encoding requires librosa. Install it with `pip install librosa soundfile`.") from _LIBROSA_IMPORT_ERROR
+
         # load pretrained model
         self.processor = Wav2Vec2Processor.from_pretrained(model_id)
         self.model = Wav2Vec2ForCTC.from_pretrained(model_id)
