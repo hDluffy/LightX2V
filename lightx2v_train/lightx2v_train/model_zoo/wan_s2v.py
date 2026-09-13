@@ -110,6 +110,11 @@ class DiffSynthWanS2VBackbone(torch.nn.Module):
         use_gradient_checkpointing=True,
         use_gradient_checkpointing_offload=False,
         strict_batch_size_one=True,
+        s2v_ref_rope_mode=None,
+        s2v_ref_source_id=None,
+        s2v_ref_rope_theta=None,
+        s2v_ref_time_base=None,
+        s2v_ref_time_margin=None,
     ):
         super().__init__()
         self.model_path = model_path
@@ -145,6 +150,29 @@ class DiffSynthWanS2VBackbone(torch.nn.Module):
                 "model_id_with_origin_paths."
             )
         self.dit = pipe.dit
+        ref_rope_config = {
+            "mode": s2v_ref_rope_mode,
+            "source_id": s2v_ref_source_id,
+            "theta": s2v_ref_rope_theta,
+            "time_base": s2v_ref_time_base,
+            "time_margin": s2v_ref_time_margin,
+        }
+        if any(value is not None for value in ref_rope_config.values()):
+            configure_ref_rope = getattr(self.dit, "configure_ref_rope", None)
+            if configure_ref_rope is None:
+                raise RuntimeError(
+                    "The loaded DiffSynth Wan-S2V model does not support "
+                    "configure_ref_rope(), but S2V reference RoPE options were provided."
+                )
+            configure_ref_rope(**ref_rope_config)
+        logger.info(
+            "Wan-S2V reference RoPE: mode={} source_id={} theta={} time_base={} time_margin={}",
+            getattr(self.dit, "s2v_ref_rope_mode", None),
+            getattr(self.dit, "s2v_ref_source_id", None),
+            getattr(self.dit, "s2v_ref_rope_theta", None),
+            getattr(self.dit, "s2v_ref_time_base", None),
+            getattr(self.dit, "s2v_ref_time_margin", None),
+        )
         self._make_audio_injection_autograd_safe()
         if hasattr(self.dit, "train"):
             self.dit.train()

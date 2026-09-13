@@ -1,6 +1,6 @@
 model:
     name: wan_s2v
-    pretrained_model_name_or_path: /path/to/Wan2.2-S2V-14B
+    pretrained_model_name_or_path: /data-training/models/Wan-AI/Wan2.2-S2V-14B
     # DiffSynth-Studio provides the trainable Wan2.2-S2V DiT backbone.
     # If pretrained_model_name_or_path points to a local Wan2.2-S2V directory
     # containing diffusion_pytorch_model*.safetensors, model_paths can stay null.
@@ -9,13 +9,19 @@ model:
     transformer_init_kwargs:
         # Optional override. Use a glob string, a list of local safetensors shards,
         # or null to auto-detect from pretrained_model_name_or_path.
-        model_paths: null
+        model_paths: /data-training/hjq/DiffSynth-Studio/models/train/rs800.safetensors
         # Optional remote-style DiffSynth config, for example:
         # - Wan-AI/Wan2.2-S2V-14B:diffusion_pytorch_model*.safetensors
         model_id_with_origin_paths: null
         download_source: null
         skip_download: null
         load_device: cpu
+        # Must match the reference RoPE settings used for full SFT.
+        s2v_ref_rope_mode: source_id_local
+        s2v_ref_source_id: 1.0
+        s2v_ref_rope_theta: 10000.0
+        s2v_ref_time_base: 30
+        s2v_ref_time_margin: 9
         use_gradient_checkpointing: true
         use_gradient_checkpointing_offload: false
         strict_batch_size_one: true
@@ -29,10 +35,10 @@ model:
     context_as_list: false
     fake:
         name: wan_s2v
-        pretrained_model_name_or_path: /path/to/Wan2.2-S2V-14B
+        pretrained_model_name_or_path: /data-training/models/Wan-AI/Wan2.2-S2V-14B
     teacher:
         name: wan_s2v
-        pretrained_model_name_or_path: /path/to/Wan2.2-S2V-14B
+        pretrained_model_name_or_path: /data-training/models/Wan-AI/Wan2.2-S2V-14B
         transformer_param_dtype: bf16
 
 distributed:
@@ -53,7 +59,7 @@ data:
     train:
         name: wan_s2v_cached_dataset
         cache_path:
-            - /path/to/wan22_s2v_cache/train
+            - /data-training/hjq/LightX2V/lightx2v_train/data_cache/wan22_s2v_480p/train
         dataset_repeat: 1
         batch_size: 1
         num_workers: 4
@@ -63,7 +69,7 @@ data:
     val:
         name: wan_s2v_cached_dataset
         cache_path:
-            - /path/to/wan22_s2v_cache/val
+            - /data-training/hjq/LightX2V/lightx2v_train/data_cache/wan22_s2v_480p/val
         max_samples: 1
         batch_size: 1
         num_workers: 0
@@ -86,7 +92,7 @@ scheduler:
 training:
     method: s2v_dmd_lora
     train_type: lora
-    max_train_iters: 1000
+    max_train_iters: 10000
     gradient_accumulation_iters: 1
     gradient_checkpointing: true
     max_grad_norm: 1.0
@@ -142,7 +148,7 @@ training:
         guidance_scale: 4.5
         negative_prompt: " "
         cfg_norm: none
-    output_dir: ./output_train/wan22_s2v_4step_lora
+    output_dir: ./output_train/wan22_s2v_4step_lora_source_id_local
 
 inference:
     method: disabled
@@ -152,7 +158,7 @@ inference:
     motion_frames: 73
     num_inference_steps: 4
     infer_every_iters: null
-    output_dir: ./output_infer/wan22_s2v_4step_lora
+    output_dir: ./output_infer/wan22_s2v_4step_lora_source_id_local
 
 logging:
     rank_zero_only: true
