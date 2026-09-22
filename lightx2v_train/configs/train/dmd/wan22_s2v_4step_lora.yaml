@@ -9,7 +9,7 @@ model:
     transformer_init_kwargs:
         # Optional override. Use a glob string, a list of local safetensors shards,
         # or null to auto-detect from pretrained_model_name_or_path.
-        model_paths: /data-training/hjq/DiffSynth-Studio/models/train/rs800.safetensors
+        model_paths: /data-training/hjq/ComfyUI/models/diffusion_models/merge_lv2_sa_step-600.safetensors
         # Optional remote-style DiffSynth config, for example:
         # - Wan-AI/Wan2.2-S2V-14B:diffusion_pytorch_model*.safetensors
         model_id_with_origin_paths: null
